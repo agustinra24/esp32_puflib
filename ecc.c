@@ -12,7 +12,9 @@
 #include "nvs.h"
 #include "puf_measurement.h"
 
+#ifndef PROVISIONING_MEASUREMENTS
 #define PROVISIONING_MEASUREMENTS 10
+#endif
 
 // value of probability of bit flip to declare it stable (or lower)
 // 0.001 works perfectly and gives about 380 bytes of PUF response

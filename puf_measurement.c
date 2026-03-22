@@ -8,6 +8,7 @@
 #include <string.h>
 #include <soc/rtc.h>
 #include <esp_sleep.h>
+#include "esp_rom_sys.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -69,7 +70,7 @@ uint8_t *backup_rtc_sram() {
 
 void turn_off_rtc_sram(int sleep_us) {
     power_down_rtc_sram();
-    ets_delay_us(sleep_us); // busy loop
+    esp_rom_delay_us(sleep_us); // busy loop
     power_up_rtc_sram();
     vTaskDelay(10 / portTICK_PERIOD_MS); // wait till sram really turns on and stabilizes (not necessary?)
 }
