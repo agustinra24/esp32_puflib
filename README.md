@@ -1,63 +1,66 @@
 # esp32_puflib
-Library which implements a SRAM based physical unclonable function on ESP32 microntroller family.
 
-## How to include a project:
-The library is a ESP-IDF component ([ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/build-system.html#example-project)).
+ESP-IDF component for SRAM-PUF experiments on ESP32-class microcontrollers.
+The component measures startup SRAM behavior, stores helper data, and exposes a
+PUF response API for enrollment and reconstruction workflows.
 
-To include this into your project, you have 2 options:
-1. Clone this repo into your own project and the component is included automatically
-2. Clone this repo into its own directory and add the path to the component search path variable:
+This component is used as a baseline in `did-puf-framework`. Treat its output as
+experimental identity material until the complete enrollment, helper handling,
+and lifecycle model have been validated for the target deployment.
 
-add `set(EXTRA_COMPONENT_DIRS /path/to/the/parent/directory/of/this/component)` line to your project CMakeLists.txt file.
+## Integration
 
-#### Partition table: (IMPORTANT)
-the library saves the helper PUF data and data during enrollment to
-the ESP-IDF NVS library. The default NVS partition is too small to save
-all the needed data, so bigger partition is needed.
+Add this directory to the ESP-IDF component search path:
 
-You can use this example partition table:
+```cmake
+set(EXTRA_COMPONENT_DIRS path/to/esp32_puflib)
+```
 
-    # ESP-IDF Partition Table
-    # Name,   Type, SubType, Offset,  Size, Flags
-    nvs,      data, nvs,     0x9000,  0x50000,
-    phy_init, data, phy,           ,  0x1000,
-    factory,  app,  factory,       ,  1M,
-save it to a .csv file and add the path to the file in menuconfig (Partition table -> Custom partition CSV file)
+Include the public header from application code:
 
-## Minimal working example:
-    #include <stdio.h>
-    #include <esp_sleep.h>
+```c
+#include "puflib.h"
+```
 
-    #include <puflib.h>
+## Partition Requirement
 
+The component stores helper data in NVS during enrollment. The application must
+provide a partition table with enough NVS space for the target helper data and
+enrollment metadata.
 
-    void app_main(void)
-    {
-        puflib_init(); // needs to be called first in app_main
-        
-        enroll_puf(); // enrollment needs to be done only once at the beginning
+Review the consuming firmware partition table before changing PUF profile,
+sample count, or helper format.
 
-            // condition will be true, if a PUF response is ready (useful after a restart)
-            if(PUF_STATE != RESPONSE_READY) {
-                bool puf_ok = get_puf_response();
-                if(!puf_ok) {
-                    get_puf_response_reset(); // the device resets now and the app starts again from app_main
-                }
-            }
+## Minimal Example
 
-            // PUF_RESPONSE_LEN is a PUF response length in bytes
-            for (size_t i = 0; i < PUF_RESPONSE_LEN; ++i) {
-                printf("%02X ", PUF_RESPONSE[i]); // PUF_RESPONSE is a buffer with the PUF response
-            }
-            printf("\n");
+```c
+#include "puflib.h"
 
-            clean_puf_response();
-        }
+void app_main(void)
+{
+    puflib_init();
 
-        void RTC_IRAM_ATTR esp_wake_deep_sleep(void) {
-            esp_default_wake_deep_sleep();
-            puflib_wake_up_stub(); // needs to be called somewhere in wake up stub
-        }
+    if (!is_puf_enrolled()) {
+        enroll_puf();
+        get_puf_response_reset();
+        return;
+    }
 
-## Documentation
-The API is documented in the puflib.h file that you need to include.
+    puf_response_t response = {0};
+    if (get_puf_response(&response) == ESP_OK) {
+        /* Use response.bytes within the application trust boundary. */
+    }
+}
+```
+
+## Security Notes
+
+- PUF responses, helper data, and derived keys are sensitive identity material.
+- Enrollment must be bound to a lifecycle policy in the consuming system.
+- Helper data handling should be reviewed before treating it as public.
+- Physical attacks, side channels, and re-enrollment attacks are not solved by
+  this component alone.
+
+## License
+
+See `LICENSE`.
